@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+  <head>
+    <title>test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Material+Icons&display=block" rel="stylesheet">
+    <script type="text/javascript" src="./node_modules/html5-qrcode/html5-qrcode.min.js"></script>
+    <script type="text/javascript" src="./node_modules/qrcode/build/qrcode.js"></script>
+  </head>
+  <body>
+    <style>
+      body {
+        font-family: Roboto;
+        margin: 0;
+      }
+    </style>
+
+    <qr-things></qr-things>
+
+    <mwc-dialog id="scanner-dialog">
+      <div id="camera-frame"></div>
+      <div id="scan-feedback"></div>
+      <mwc-button outlined slot="primaryAction" dialogAction="close">close</mwc-button>
+    </mwc-dialog>
+
+    <mwc-snackbar id=snackbar></mwc-snackbar>
+
+
+    <script type="module" src="./qr-things.js"></script>
+    <script>
+      let scanner;
+      window.openScannerDialog = function () {
+        if (scanner === undefined) {
+          scanner = new Html5QrcodeScanner('camera-frame', { fps: 10, qrbox: 250 })
+        }
+        window['scanner-dialog'].show()
+        scanner.render((a, b) => {
+          console.log(a, b)
+          window['scan-feedback'].textContent = `${a}, ${b}`
+        }, (e) => {
+          console.log(e)
+        })
+      }
+
+      window.toast = function (text, timeoutMs = 4000) {
+        snackbar.labelText = text;
+        snackbar.timeoutMs = timeoutMs;
+        snackbar.open = true
+      }
+    </script>
+  </body>
+</html>
