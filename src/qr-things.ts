@@ -6,24 +6,32 @@ import '@material/mwc-icon-button'
 import '@material/mwc-button'
 import '@material/mwc-dialog'
 import '@material/mwc-snackbar'
-// import {Html5QrcodeScanner} from 'html5-qrcode'
-// @ts-ignore
-// window.Html5QrcodeScanner = Html5QrcodeScanner;
 import './qrcode-dialog'
 import { QRCodeDialog } from './qrcode-dialog'
+import './data-manager'
+import './thing-form'
+import { DataManager } from './data-manager'
+// import { ThingForm } from './thing-form'
+import './thing-informations'
+import './AudiosManager'
+import './audio-recorder'
+import { ThingForm } from './thing-form'
 
 @customElement('qr-things')
 export class QRThings extends LitElement {
+  private dataManager: DataManager;
+
   @state()
-  private _data?: { [directory:string]: Thing[] };
-  @state()
-  private dirname?: string;
+  private collectionName?: string;
 
   @query('qrcode-dialog') qrCodeDialog!: QRCodeDialog;
+  // @query('thing-form') thingForm!: ThingForm;
 
   constructor() {
     super()
-    this.fetchData()
+    window.app = this;
+    window.dataManager = this.dataManager = new DataManager()
+    // window.audioRecorder = this.audioRecorder = new AudioRecorder()
 
     window.addEventListener('hashchange', (e) => {
       this.navigateAccordingly()
@@ -48,17 +56,20 @@ export class QRThings extends LitElement {
     display: flex;
     align-items: center;
     background-color: #e0e0e0;
-    padding: 4px 4px 4px 12px;
+    padding: 6px;
     margin: 6px;
     cursor: pointer;
     user-select: none;
     -webkit-user-select: none;
   }
+  .thing mwc-icon-button {
+    /* --mdc-icon-button-size: 19px;
+    --mdc-icon-size: 11px; */
+  }
   `
 
   render () {
-    if (this._data === undefined) return nothing;
-    const directories = Object.keys(this._data)
+    const collections = this.dataManager.collections;
 
     return html`
     <header style="display:flex;">
@@ -67,8 +78,8 @@ export class QRThings extends LitElement {
         @click=${() => this.showScannerDialog()}></mwc-icon-button>
     </header>
 
-    ${!this.dirname ? html`
-      ${directories.map(d => html`
+    ${!this.collectionName ? html`
+      ${collections.map(d => html`
       <div class="directory"
         @click=${() => this.goToDirectory(d)}><mwc-icon style="margin-right:5px;">folder</mwc-icon><span>${d}</span></div>
       `)}
@@ -76,46 +87,112 @@ export class QRThings extends LitElement {
         <mwc-button unelevated icon="add"
           @click=${() => this.addDirectory()}>add</mwc-button>
       </div>
-    ` : nothing }
+    ` : nothing}
 
 
-    ${this.dirname ? html`
-      ${this._data[this.dirname].map(t => {
-        return html`<div class="thing"><span style="flex:1">${t.label}</span><mwc-icon-button icon="qr_code_scanner" @click=${() => this.qrCodeDialog.open(t.id)}></mwc-icon-button></div>`
+    ${this.collectionName ? html`
+      ${this.dataManager.getThings(this.collectionName).map(t => {
+        return html`<div class="thing">
+          <span>${t.label}</span>
+          <span style="flex:1;color:grey;font-size:0.8em;padding-left:6px">#${t.id}</span>
+          <mwc-icon-button icon="edit"
+            @click=${() => this.onEditButtonClick(t)}></mwc-icon-button>
+          <mwc-icon-button icon="qr_code_scanner" @click=${() => this.qrCodeDialog.open(t.id)}></mwc-icon-button>
+        </div>`
       })}
+      <div style="text-align:center">
+        <mwc-button unelevated icon="add"
+          @click=${() => this.onAddThingClick()}>add QR code</mwc-button>
+      </div>
     ` : nothing}
 
 
     <qrcode-dialog></qrcode-dialog>
 
+    <!-- <thing-form></thing-form> -->
+
     <mwc-snackbar id=snackbar></mwc-snackbar>
     `
-  }
-
-  get directories () {
-    if (!this._data) return []
-    return Object.keys(this._data)
   }
 
   private addDirectory() {
     const name = prompt('directory name')
     if (name === null || name === '') {
-      return;
+      return
     }
-    if (this.directories.indexOf(name) >= 0) {
+    if (this.dataManager.collectionExists(name)) {
       window.toast('This collection already exists')
-      return;
+      return
     }
-    this._data![name] = []
+    this.dataManager.addCollection(name)
     this.goToDirectory(name)
   }
+
+  private async editThing (type: 'add'|'edit', thing: Thing) {
+    try {
+      await window.thingForm.open(type, thing)
+    } catch (e) {
+      // on cancel
+      throw e
+    }
+  }
+
+  private async onAddThingClick() {
+    // Construct a new thing
+    // Or reuse if there is one in the form
+    let thing
+    if (window.thingForm.thing['add']) {
+      thing = this.dataManager.addThing(this.collectionName!, window.thingForm.thing['add'])
+    }
+    else {
+      thing = this.dataManager.addThing(this.collectionName!)
+    }
+    this.requestUpdate()
+
+    try {
+      if (window.thingForm.type === 'edit') {
+
+      }
+      await this.editThing('add', thing)
+    }
+    catch (e) {
+      this.dataManager.removeThing(thing)
+    }
+    finally {
+      this.requestUpdate()
+    }
+  }
+
+  private async onEditButtonClick(t: Thing) {
+    const clone = JSON.parse(JSON.stringify(t)) // we clone the object in case of a drawback
+    try {
+      await this.editThing('edit', t)
+    }
+    catch (e) {
+      this.dataManager.replaceThing(t, clone)
+    }
+    finally {
+      this.requestUpdate()
+    }
+  }
+
+  // private async openThingFormDialog (thing: Thing) {
+  //   try {
+  //     const result = await this.thingForm.open(thing)
+  //     // success we save the informations
+  //     this.dataManager.saveRemote()
+  //   } catch (e) {
+  //     window.toast('cancelled')
+  //     throw e
+  //   }
+  // }
 
   private showScannerDialog() {
     window.openScannerDialog()
   }
 
   private goToDirectory(d: string) {
-    this.dirname = d;
+    this.collectionName = d;
     window.location.hash = `${d}`
   }
 
@@ -124,22 +201,19 @@ export class QRThings extends LitElement {
     // Get the hash
     const hash = window.location.hash.slice(1)
     if (hash) {
-      this.dirname = hash
+      this.collectionName = hash
     }
     else {
-      this.dirname = undefined;
+      this.collectionName = undefined;
     }
-  }
-
-  private async fetchData () {
-    const response = await fetch('/data')
-    this._data = await response.json()
   }
 }
 
 
 declare global {
   interface Window {
+    app: QRThings;
+    thingForm: ThingForm;
     openScannerDialog: () => void;
     toast: (message: string, timeoutMs?: number) => void;
   }

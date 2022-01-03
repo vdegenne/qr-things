@@ -11,6 +11,7 @@
   <body>
     <style>
       body {
+        /* background-color: black; */
         font-family: Roboto;
         margin: 0;
       }
@@ -20,9 +21,13 @@
 
     <mwc-dialog id="scanner-dialog">
       <div id="camera-frame"></div>
-      <div id="scan-feedback"></div>
+      <thing-informations id="thing-informations"></thing-informations>
       <mwc-button outlined slot="primaryAction" dialogAction="close">close</mwc-button>
     </mwc-dialog>
+
+    <thing-form id=thingForm></thing-form>
+
+    <audio-recorder id="audioRecorder"></audio-recorder>
 
     <mwc-snackbar id=snackbar></mwc-snackbar>
 
@@ -35,12 +40,14 @@
           scanner = new Html5QrcodeScanner('camera-frame', { fps: 10, qrbox: 250 })
         }
         window['scanner-dialog'].show()
-        scanner.render((a, b) => {
-          console.log(a, b)
-          window['scan-feedback'].textContent = `${a}, ${b}`
-        }, (e) => {
-          console.log(e)
-        })
+        scanner.render(
+          function (a, b) {
+            window['thing-informations'].setAttribute('thingId', a);
+          },
+          function (e) {
+            // console.log(e)
+          }
+        )
       }
 
       window.toast = function (text, timeoutMs = 4000) {

@@ -1,11 +1,1 @@
-{
-  "home": [{
-    "id": 1353,
-    "label": "table"
-  },
-  {
-    "id": 525525252,
-    "label": "wall"
-  }
-  ]
-}
+{"home":[{"id":1353,"label":"tableasdf","audio":false,"playAudioOnScan":true},{"id":525525252,"label":"wall2","audio":false,"playAudioOnScan":false},{"id":0,"label":"test2asdfhaha","audio":true,"playAudioOnScan":true},{"id":1,"label":"new one haha","audio":false,"playAudioOnScan":true},{"id":2,"label":"yooooo 3","audio":false,"playAudioOnScan":true}]}
