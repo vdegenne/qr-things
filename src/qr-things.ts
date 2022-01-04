@@ -46,11 +46,13 @@ export class QRThings extends LitElement {
   .directory {
     display: flex;
     align-items: center;
-    background-color: #795548;
-    color: white;
+    color: #795548;
     cursor: pointer;
-    padding: 7px;
+    padding: 12px;
     margin: 7px;
+  }
+  .directory:hover {
+    background-color: #eeeeee;
   }
   .thing {
     display: flex;
