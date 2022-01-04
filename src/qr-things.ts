@@ -130,7 +130,27 @@ export class QRThings extends LitElement {
 
   private async editThing (type: 'add'|'edit', thing: Thing) {
     try {
-      await window.thingForm.open(type, thing)
+      const returned = await window.thingForm.open(type, thing) as Thing
+      // We save the audio if there is one and it's different from the database
+      let audioUrl = window.thingForm.audioUrl[type]
+      if (audioUrl && audioUrl !== window.audiosManager.getThingAudioUrl(returned)) {
+        // We try to save the audio file remotely before saving the general data
+        const blob = await (await fetch(audioUrl)).blob()
+        try {
+          await window.audiosManager.sendThingAudio(returned.id, blob)
+        } catch (e) {
+          window.toast('Something went wrong while trying to save the audio file')
+        }
+        window.audiosManager.loadThingAudio(returned.id, window.thingForm.audioUrl[type]!)
+      }
+
+      // we finally save all the data remotely
+      try {
+        // @TODO: Do not save if thing's metadata haven't changed
+        await window.dataManager.saveRemote()
+      } catch (e) {
+        window.toast('Something went wrong while trying to save the data remotely')
+      }
     } catch (e) {
       // on cancel
       throw e
@@ -153,7 +173,8 @@ export class QRThings extends LitElement {
       if (window.thingForm.type === 'edit') {
 
       }
-      await this.editThing('add', thing)
+      const result = await this.editThing('add', thing)
+      window.thingForm.reset()
     }
     catch (e) {
       this.dataManager.removeThing(thing)

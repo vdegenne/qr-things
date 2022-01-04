@@ -20,8 +20,11 @@ export class AudioRecorder extends LitElement {
 
   private _stream?: MediaStream;
   private _mediaRecorder?: MediaRecorder;
-  private _blob?: Blob;
-  private _thingId?: number;
+  // private _blob?: Blob;
+  // private _thingId?: number;
+
+  private _resolve?: (value: string) => void;
+  private _reject?: (reason?: any) => void;
 
   @query('mwc-dialog') dialog!: Dialog;
 
@@ -49,15 +52,19 @@ export class AudioRecorder extends LitElement {
   }
 
   private onDialogDismiss() {
+    // const ok = confirm('If you cancel this recording will be lost. Are you sure to continue?')
+    // if (!ok) { return }
     // Reset before closing
     this.dialog.close()
     this.reset()
+    this._reject!()
   }
 
   private onDialogAccept() {
     // We leave the properties as is (for the form)
-    window.app.thingForm.requestUpdate()
+    // window.app.thingForm.requestUpdate()
     this.dialog.close()
+    this._resolve!(this._audioUrl as string)
   }
 
   private async toggleRecording() {
@@ -75,8 +82,8 @@ export class AudioRecorder extends LitElement {
       })
       // On recorder stop
       this._mediaRecorder.addEventListener('stop', () => {
-        this._blob = new Blob(audioChunks)
-        this._audioUrl = URL.createObjectURL(this._blob);
+        const blob = new Blob(audioChunks)
+        this._audioUrl = URL.createObjectURL(blob);
         this.recording = false;
       })
 
@@ -89,14 +96,17 @@ export class AudioRecorder extends LitElement {
   }
 
   public open (thingId: number) {
-    this._thingId = thingId
+    // this._thingId = thingId
     this.dialog.show()
+    return new Promise<string>((resolve, reject) => {
+      this._resolve = resolve
+      this._reject = reject
+    })
   }
 
   private reset() {
-    this._blob = undefined;
+    // this._blob = undefined;
     this._audioUrl = undefined;
-    this._thingId = undefined;
-    throw new Error('Method not implemented.');
+    // this._thingId = undefined;
   }
 }

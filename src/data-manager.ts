@@ -18,8 +18,7 @@ export class DataManager {
       thing = {
         id: this.nextId,
         label: 'Untitled Thing',
-        audio: false,
-        playAudioOnScan: true
+        // playAudioOnScan: true
       }
     }
     this.data[collectionName].push(thing)
@@ -112,11 +111,13 @@ export class DataManager {
   }
 
   public async saveRemote () {
-    await fetch('/data', {
+    const response = await fetch('/data', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(this.data)
     })
+    if (response.status !== 200)
+      throw new Error()
   }
 }
 

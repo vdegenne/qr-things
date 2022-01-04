@@ -4,7 +4,8 @@ const Koa = require('koa')
 const Router = require('koa-router')
 const koaStatic = require('koa-static')
 const koaBody = require('koa-body')
-const {readFileSync, writeFileSync, copyFileSync, existsSync} = require('fs')
+const {readFileSync, writeFileSync, copyFileSync, existsSync, readdirSync, statSync, linkSync} = require('fs')
+const path = require('path')
 
 const app = new Koa
 const router = new Router
@@ -18,13 +19,22 @@ router.get('/data', function (ctx) {
 })
 
 router.put('/data', function (ctx) {
+  if (!existsSync('data/data.json')) {
+    linkSync('data/data.json')
+  }
   writeFileSync('data/data.json', JSON.stringify(ctx.request.body))
   ctx.body = ''
+})
+
+router.get('/audios-map', function (ctx) {
+  let files = readdirSync('data/audios')
+  ctx.body = files.map(f => [parseInt(path.parse(`data/audios/${f}`).name), undefined])
 })
 
 router.get('/audios/:thingId.wav', function (ctx) {
   const path = `data/audios/${ctx.params.thingId}.wav`
   if (existsSync(path)) {
+    ctx.set('content-type', 'audio/wav')
     ctx.body = readFileSync(path)
   }
 })

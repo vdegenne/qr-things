@@ -4502,8 +4502,7 @@ class DataManager {
             thing = {
                 id: this.nextId,
                 label: 'Untitled Thing',
-                audio: false,
-                playAudioOnScan: true
+                // playAudioOnScan: true
             };
         }
         this.data[collectionName].push(thing);
@@ -4580,11 +4579,13 @@ class DataManager {
         window.audiosManager.loadAudios();
     }
     async saveRemote() {
-        await fetch('/data', {
+        const response = await fetch('/data', {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(this.data)
         });
+        if (response.status !== 200)
+            throw new Error();
     }
 }
 
@@ -6526,12 +6527,13 @@ let ThingForm = class ThingForm extends s$1 {
         super(...arguments);
         this.type = 'add';
         this.thing = { 'add': undefined, 'edit': undefined };
+        this.audioUrl = { 'add': undefined, 'edit': undefined };
     }
     render() {
         // const thing = this.thing && window.app.getThing(this.thing)
         const thing = this.thing[this.type];
         return p `
-    <mwc-dialog heading=${(thing === null || thing === void 0 ? void 0 : thing.label) || ''} escapeKeyAction="" scrimClickAction="">
+    <mwc-dialog .heading=${p `<mwc-icon>view_in_ar</mwc-icon><span style="vertical-align:text-bottom;margin-left:5px">${this.type}</span>`} escapeKeyAction="" scrimClickAction="">
 
       ${this.thing ? p `
         <mwc-textfield label="label" .value=${l((thing === null || thing === void 0 ? void 0 : thing.label) || '')}
@@ -6542,11 +6544,16 @@ let ThingForm = class ThingForm extends s$1 {
 
         <hr>
 
-        <div style="display:flex;align-items: center;justify-content:space-between">
-          <span>no audio</span>
-          <mwc-button unelevated icon="mic"
-            @click=${() => window.audioRecorder.open(thing.id)}
-          >record</mwc-button>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          ${this.audioUrl[this.type] ? p `
+          <audio src=${this.audioUrl[this.type]} controls style="display:block"></audio>
+          ` : p `
+          <span style="padding-left:19px">no audio</span>
+          `}
+          <mwc-icon-button unelevated icon="mic"
+            style="color:#4caf50"
+            @click=${() => this.onRecordButtonClick()}
+          ></mwc-icon-button>
         </div>
 
       ` : T}
@@ -6554,9 +6561,19 @@ let ThingForm = class ThingForm extends s$1 {
       <mwc-button outlined slot="secondaryAction" dialogAction="close"
         @click=${() => this._reject()}>cancel</mwc-button>
       <mwc-button unelevated slot="primaryAction" dialogAction="close"
-        @click=${() => this._resolve(this.thing)}>add</mwc-button>
+        @click=${() => this._resolve(this.thing[this.type])}>add</mwc-button>
     </mwc-dialog>
     `;
+    }
+    async onRecordButtonClick() {
+        try {
+            const audioUrl = await window.audioRecorder.open(0);
+            this.audioUrl[this.type] = audioUrl;
+        }
+        catch (e) {
+            // cancelled
+        }
+        this.requestUpdate();
     }
     onLabelKeyup(e) {
         this.thing[this.type].label = e.target.value;
@@ -6565,6 +6582,9 @@ let ThingForm = class ThingForm extends s$1 {
     open(type, thing) {
         this.type = type;
         this.thing[type] = thing;
+        if (type === 'edit') {
+            this.audioUrl[type] = window.audiosManager.getThingAudioUrl(thing);
+        }
         this.requestUpdate();
         this.dialog.show();
         return new Promise((resolve, reject) => {
@@ -6573,6 +6593,9 @@ let ThingForm = class ThingForm extends s$1 {
         });
     }
     reset() {
+        this.audioUrl[this.type] = undefined;
+        this.thing[this.type] = undefined;
+        this.requestUpdate();
     }
 };
 ThingForm.styles = r$4 `
@@ -6589,6 +6612,9 @@ __decorate([
 __decorate([
     t$1()
 ], ThingForm.prototype, "thing", void 0);
+__decorate([
+    t$1()
+], ThingForm.prototype, "audioUrl", void 0);
 __decorate([
     i$2('mwc-dialog')
 ], ThingForm.prototype, "dialog", void 0);
@@ -6618,8 +6644,8 @@ let ThingInformations = class ThingInformations extends s$1 {
     ${thing.label}
     `;
     }
-    playSound() {
-        const audio = window.audiosManager.getThingAudio(window.dataManager.getThingById(this.thingId));
+    playAudio() {
+        const audio = window.audiosManager.getThingAudio(this.thingId);
         if (audio) {
             audio.play();
         }
@@ -6637,37 +6663,54 @@ class AudiosManager {
         this.audios = {};
         window.audiosManager = this;
     }
-    getThingAudio(thing) {
-        return this.audios[thing.id];
+    getThingAudio(thingId) {
+        return this.audios[thingId];
+    }
+    getThingAudioUrl(thing) {
+        const audio = this.audios[thing.id];
+        if (!audio)
+            return undefined;
+        return audio.src;
+    }
+    // public updateThingAudio (thing: Thing, audioUrl: string) {
+    //   const audio = this.audios[thing.id] = new Audio(audioUrl)
+    //   audio.controls = true
+    //   return audio
+    // }
+    async getAudioMap() {
+        return await (await fetch('/audios-map')).json();
     }
     async loadAudios() {
         // Get all ids
-        window.dataManager.things.forEach(t => {
-            if (t.audio)
-                this.loadThing(t);
-        });
+        this.getAudioMap().then(map => map.forEach(([id, url]) => {
+            // if (url.audio)
+            this.loadThingAudio(id, `./audios/${id}.wav`);
+        }));
     }
-    async loadThing(thing) {
-        if (thing.audio === false)
-            return undefined;
-        return this.audios[thing.id] = new Audio(`./audios/${thing.id}.wav`);
+    async loadThingAudio(thingId, audioUrl) {
+        const audio = this.audios[thingId] = new Audio(audioUrl);
+        audio.controls = true;
+        return audio;
     }
-    async unloadVoice(thing) {
+    async unloadThing(thing) {
         delete this.audios[thing.id];
     }
-    async sendVoiceAudio(thing, blob) {
+    async sendThingAudio(thingId, blob) {
         const formData = new FormData;
         formData.append('audio', blob);
-        await fetch(`/audio/${thing.id}`, {
-            method: 'POST',
+        const response = await fetch(`./audio/${thingId}`, {
+            method: 'PUT',
             body: formData
         });
+        if (response.status !== 200) {
+            throw new Error();
+        }
     }
-    async removeVoiceAudio(thing) {
-        await fetch(`/audio/${thing.id}`, {
+    async removeThingAudio(thing) {
+        await fetch(`./audio/${thing.id}`, {
             method: 'DELETE'
         });
-        this.unloadVoice(thing);
+        this.unloadThing(thing);
     }
 }
 window.audiosManager = new AudiosManager;
@@ -6700,14 +6743,18 @@ let AudioRecorder = class AudioRecorder extends s$1 {
     `;
     }
     onDialogDismiss() {
+        // const ok = confirm('If you cancel this recording will be lost. Are you sure to continue?')
+        // if (!ok) { return }
         // Reset before closing
         this.dialog.close();
         this.reset();
+        this._reject();
     }
     onDialogAccept() {
         // We leave the properties as is (for the form)
-        window.app.thingForm.requestUpdate();
+        // window.app.thingForm.requestUpdate()
         this.dialog.close();
+        this._resolve(this._audioUrl);
     }
     async toggleRecording() {
         if (!this.recording) {
@@ -6723,8 +6770,8 @@ let AudioRecorder = class AudioRecorder extends s$1 {
             });
             // On recorder stop
             this._mediaRecorder.addEventListener('stop', () => {
-                this._blob = new Blob(audioChunks);
-                this._audioUrl = URL.createObjectURL(this._blob);
+                const blob = new Blob(audioChunks);
+                this._audioUrl = URL.createObjectURL(blob);
                 this.recording = false;
             });
             this._mediaRecorder.start();
@@ -6735,14 +6782,17 @@ let AudioRecorder = class AudioRecorder extends s$1 {
         }
     }
     open(thingId) {
-        this._thingId = thingId;
+        // this._thingId = thingId
         this.dialog.show();
+        return new Promise((resolve, reject) => {
+            this._resolve = resolve;
+            this._reject = reject;
+        });
     }
     reset() {
-        this._blob = undefined;
+        // this._blob = undefined;
         this._audioUrl = undefined;
-        this._thingId = undefined;
-        throw new Error('Method not implemented.');
+        // this._thingId = undefined;
     }
 };
 __decorate([
@@ -6828,7 +6878,28 @@ let QRThings = class QRThings extends s$1 {
     }
     async editThing(type, thing) {
         try {
-            await window.thingForm.open(type, thing);
+            const returned = await window.thingForm.open(type, thing);
+            // We save the audio if there is one and it's different from the database
+            let audioUrl = window.thingForm.audioUrl[type];
+            if (audioUrl && audioUrl !== window.audiosManager.getThingAudioUrl(returned)) {
+                // We try to save the audio file remotely before saving the general data
+                const blob = await (await fetch(audioUrl)).blob();
+                try {
+                    await window.audiosManager.sendThingAudio(returned.id, blob);
+                }
+                catch (e) {
+                    window.toast('Something went wrong while trying to save the audio file');
+                }
+                window.audiosManager.loadThingAudio(returned.id, window.thingForm.audioUrl[type]);
+            }
+            // we finally save all the data remotely
+            try {
+                // @TODO: Do not save if thing's metadata haven't changed
+                await window.dataManager.saveRemote();
+            }
+            catch (e) {
+                window.toast('Something went wrong while trying to save the data remotely');
+            }
         }
         catch (e) {
             // on cancel
@@ -6849,7 +6920,8 @@ let QRThings = class QRThings extends s$1 {
         try {
             if (window.thingForm.type === 'edit') {
             }
-            await this.editThing('add', thing);
+            const result = await this.editThing('add', thing);
+            window.thingForm.reset();
         }
         catch (e) {
             this.dataManager.removeThing(thing);

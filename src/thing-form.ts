@@ -11,8 +11,11 @@ import { TextField } from '@material/mwc-textfield';
 export class ThingForm extends LitElement {
   @state()
   public type: 'add'|'edit' = 'add';
+
   @state()
   public thing: { 'add'?: Thing, 'edit'?: Thing } = { 'add': undefined, 'edit': undefined};
+  @state()
+  public audioUrl: { 'add'?: string, 'edit'?: string } = { 'add': undefined, 'edit': undefined };
 
   private _resolve!: (value: unknown) => void;
   private _reject!: (reason?: any) => void;
@@ -33,7 +36,7 @@ export class ThingForm extends LitElement {
     const thing = this.thing[this.type]
 
     return html`
-    <mwc-dialog heading=${thing?.label || ''} escapeKeyAction="" scrimClickAction="">
+    <mwc-dialog .heading=${html`<mwc-icon>view_in_ar</mwc-icon><span style="vertical-align:text-bottom;margin-left:5px">${this.type}</span>`} escapeKeyAction="" scrimClickAction="">
 
       ${this.thing ? html`
         <mwc-textfield label="label" .value=${live(thing?.label || '')}
@@ -43,11 +46,16 @@ export class ThingForm extends LitElement {
 
         <hr>
 
-        <div style="display:flex;align-items: center;justify-content:space-between">
-          <span>no audio</span>
-          <mwc-button unelevated icon="mic"
-            @click=${() => window.audioRecorder.open(thing!.id)}
-          >record</mwc-button>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          ${this.audioUrl[this.type] ? html`
+          <audio src=${this.audioUrl[this.type]!} controls style="display:block"></audio>
+          ` : html`
+          <span style="padding-left:19px">no audio</span>
+          `}
+          <mwc-icon-button unelevated icon="mic"
+            style="color:#4caf50"
+            @click=${() => this.onRecordButtonClick()}
+          ></mwc-icon-button>
         </div>
 
       ` : nothing}
@@ -55,9 +63,19 @@ export class ThingForm extends LitElement {
       <mwc-button outlined slot="secondaryAction" dialogAction="close"
         @click=${() => this._reject()}>cancel</mwc-button>
       <mwc-button unelevated slot="primaryAction" dialogAction="close"
-        @click=${() => this._resolve(this.thing)}>add</mwc-button>
+        @click=${() => this._resolve(this.thing[this.type])}>add</mwc-button>
     </mwc-dialog>
     `
+  }
+
+  private async onRecordButtonClick() {
+    try {
+      const audioUrl = await window.audioRecorder.open(0)
+      this.audioUrl[this.type] = audioUrl
+    } catch (e) {
+      // cancelled
+    }
+    this.requestUpdate()
   }
 
   private onLabelKeyup (e) {
@@ -68,6 +86,9 @@ export class ThingForm extends LitElement {
   public open (type: 'add'|'edit', thing: Thing) {
     this.type = type;
     this.thing[type]! = thing;
+    if (type === 'edit') {
+      this.audioUrl[type] = window.audiosManager.getThingAudioUrl(thing)
+    }
     this.requestUpdate()
     this.dialog.show()
     return new Promise((resolve, reject) => {
@@ -77,5 +98,8 @@ export class ThingForm extends LitElement {
   }
 
   public reset () {
+    this.audioUrl[this.type] = undefined
+    this.thing[this.type] = undefined
+    this.requestUpdate()
   }
 }

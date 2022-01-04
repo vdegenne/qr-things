@@ -30,10 +30,8 @@ export class ThingInformations extends LitElement {
     `
   }
 
-  playSound () {
-    const audio = window.audiosManager.getThingAudio(
-      window.dataManager.getThingById(this.thingId!)!
-    )
+  playAudio () {
+    const audio = window.audiosManager.getThingAudio(this.thingId!)
     if (audio) {
       audio.play()
     }

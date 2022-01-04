@@ -1,9 +1,11 @@
 import { Thing } from './types';
 
-export type AudioInformations = {
-  url: string;
-  audio: HTMLAudioElement;
-}
+// export type AudioInformations = {
+//   url: string;
+//   audio: HTMLAudioElement;
+// }
+
+export type AudiosMap = [number, string][];
 
 declare global {
   interface Window {
@@ -18,40 +20,59 @@ export class AudiosManager {
     window.audiosManager = this;
   }
 
-  public getThingAudio (thing: Thing) {
-    return this.audios[thing.id]
+  public getThingAudio (thingId: number) {
+    return this.audios[thingId]
+  }
+  public getThingAudioUrl (thing: Thing) {
+    const audio = this.audios[thing.id]
+    if (!audio) return undefined;
+    return audio.src
+  }
+
+  // public updateThingAudio (thing: Thing, audioUrl: string) {
+  //   const audio = this.audios[thing.id] = new Audio(audioUrl)
+  //   audio.controls = true
+  //   return audio
+  // }
+
+  private async getAudioMap (): Promise<AudiosMap> {
+    return await (await fetch('/audios-map')).json()
   }
 
   public async loadAudios () {
     // Get all ids
-    window.dataManager.things.forEach(t => {
-      if (t.audio)
-        this.loadThing(t)
-    })
+    this.getAudioMap().then(map => map.forEach(([id, url]) => {
+      // if (url.audio)
+      this.loadThingAudio(id, `./audios/${id}.wav`)
+    }))
   }
 
-  public async loadThing (thing: Thing) {
-    if (thing.audio === false) return undefined;
-    return this.audios[thing.id] = new Audio(`./audios/${thing.id}.wav`)
+  public async loadThingAudio (thingId: number, audioUrl: string) {
+    const audio = this.audios[thingId] = new Audio(audioUrl)
+    audio.controls = true
+    return audio
   }
-  public async unloadVoice (thing: Thing) {
+  public async unloadThing (thing: Thing) {
     delete this.audios[thing.id]
   }
 
-  public async sendVoiceAudio (thing: Thing, blob: Blob) {
+  public async sendThingAudio (thingId: number, blob: Blob) {
     const formData = new FormData
     formData.append('audio', blob)
-    await fetch(`/audio/${thing.id}`, {
-      method: 'POST',
+    const response = await fetch(`./audio/${thingId}`, {
+      method: 'PUT',
       body: formData
     })
+    if (response.status !== 200) {
+      throw new Error()
+    }
   }
 
-  public async removeVoiceAudio (thing: Thing) {
-    await fetch(`/audio/${thing.id}`, {
+  public async removeThingAudio (thing: Thing) {
+    await fetch(`./audio/${thing.id}`, {
       method: 'DELETE'
     })
-    this.unloadVoice(thing)
+    this.unloadThing(thing)
   }
 }
 

@@ -37,17 +37,18 @@
       let scanner;
       window.openScannerDialog = function () {
         if (scanner === undefined) {
-          scanner = new Html5QrcodeScanner('camera-frame', { fps: 10, qrbox: 250 })
+          scanner = new Html5QrcodeScanner('camera-frame', { fps: 12, qrbox: 500 })
+          scanner.render(
+            function (a, b) {
+              window['thing-informations'].setAttribute('thingId', a);
+              window['thing-informations'].playAudio()
+            },
+            function (e) {
+              // console.log(e)
+            }
+          )
         }
         window['scanner-dialog'].show()
-        scanner.render(
-          function (a, b) {
-            window['thing-informations'].setAttribute('thingId', a);
-          },
-          function (e) {
-            // console.log(e)
-          }
-        )
       }
 
       window.toast = function (text, timeoutMs = 4000) {
