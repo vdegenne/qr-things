@@ -4,7 +4,7 @@ const Koa = require('koa')
 const Router = require('koa-router')
 const koaStatic = require('koa-static')
 const koaBody = require('koa-body')
-const {readFileSync, writeFileSync, copyFileSync, existsSync, readdirSync, statSync, linkSync} = require('fs')
+const {readFileSync, writeFileSync, copyFileSync, existsSync, readdirSync, statSync, linkSync, mkdirSync} = require('fs')
 const path = require('path')
 
 const app = new Koa
@@ -15,13 +15,15 @@ app.use(koaStatic('public'))
 app.use(koaBody({ multipart: true }))
 
 router.get('/data', function (ctx) {
+  if (!existsSync('data')) {
+    mkdirSync('data')
+    mkdirSync('data/audios')
+    writeFileSync('data/data.json',  '{}')
+  }
   ctx.body = readFileSync('data/data.json')
 })
 
 router.put('/data', function (ctx) {
-  if (!existsSync('data/data.json')) {
-    linkSync('data/data.json')
-  }
   writeFileSync('data/data.json', JSON.stringify(ctx.request.body))
   ctx.body = ''
 })
